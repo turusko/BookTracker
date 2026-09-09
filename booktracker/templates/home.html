@@ -1,0 +1,150 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="wrap">
+<header>
+    <div>
+        <h1 class="brand-heading"><img class="brand-icon" src="{{ url_for('static', filename='booktracker-icon.png') }}" alt="" width="40" height="40"> {{ app_title }}</h1>
+        <div class="sub">Kobo UK deal and price-history tracker</div>
+    </div>
+    <div class="header-actions">
+        <button type="button" class="secondary" onclick="openSettings()">Settings</button>
+        <form method="post" action="{{ url_for('scan') }}">
+            <button type="submit">Check Kobo now</button>
+        </form>
+    </div>
+</header>
+
+{% if message %}
+<div class="notice">{{ message }}</div>
+{% endif %}
+
+<div class="stats">
+    <div class="stat"><strong>{{ summary.new_today or 0 }}</strong><span>New today</span></div>
+    <div class="stat"><strong>{{ summary.penny99 or 0 }}</strong><span>99p deals</span></div>
+    <div class="stat"><strong>{{ summary.drops or 0 }}</strong><span>Price drops</span></div>
+    <div class="stat"><strong>{{ summary.active or 0 }}</strong><span>Active deals</span></div>
+</div>
+
+<div class="controls">
+    <div class="tabs">
+        <a class="tab" href="{{ url_for('wishlist') }}">Wish List</a>
+        {% for key, label in tabs %}
+        <a class="tab {% if view == key %}active{% endif %}"
+           href="{{ url_for('home', view=key) }}">{{ label }}</a>
+        {% endfor %}
+    </div>
+    <form class="search" method="get">
+        <input type="hidden" name="view" value="{{ view }}">
+        <input name="q" value="{{ search }}" placeholder="Search title or author">
+    </form>
+</div>
+
+{% if books %}
+<table>
+    <thead>
+        <tr>
+            <th>Book</th>
+            <th>Price</th>
+            <th class="hide-mobile">Source</th>
+            <th class="hide-mobile">First seen</th>
+        </tr>
+    </thead>
+    <tbody>
+    {% for book in books %}
+        <tr>
+            <td class="book">
+                {% if book.id in wishlist_ids %}
+                <div class="small">On your wish list</div>
+                {% else %}
+                <form method="post" action="{{ url_for('wishlist_add') }}" style="float:right">
+                    <input type="hidden" name="book_id" value="{{ book.id }}">
+                    <button class="secondary" type="submit">Add to wish list</button>
+                </form>
+                {% endif %}
+                <a href="{{ book.url }}" target="_blank" rel="noopener">{{ book.title }}</a>
+                {% if book.author %}<div class="author">{{ book.author }}</div>{% endif %}
+                {% if book.genres %}<div class="small">{{ book.genres }}</div>{% endif %}
+                <div style="margin-top:5px">
+                    {% if book.current_price <= 0.99 %}
+                        <span class="badge badge99">99p</span>
+                    {% endif %}
+                    {% if book.first_seen[:10] == today %}
+                        <span class="badge badgenew">NEW</span>
+                    {% endif %}
+                    {% if book.interest_score %}
+                        <span class="badge badgefav" title="{{ book.matches|join(', ') }}">
+                            ★ MATCH{% if book.matches %}: {{ book.matches[:2]|join(', ') }}{% endif %}
+                        </span>
+                    {% endif %}
+                </div>
+            </td>
+            <td>
+                {% if book.old_price and book.old_price > book.current_price %}
+                    <span class="old">{{ book.old_price|money }}</span>
+                {% endif %}
+                <span class="price">{{ book.current_price|money }}</span>
+                {% if book.previous_price and book.previous_price > book.current_price %}
+                    <div class="small">previously {{ book.previous_price|money }}</div>
+                {% endif %}
+            </td>
+            <td class="hide-mobile">{{ book.source }}</td>
+            <td class="hide-mobile">
+                <div>{{ book.first_seen[:10] }}</div>
+                <div class="small">{{ book.last_seen[:10] }}</div>
+            </td>
+        </tr>
+    {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<div class="empty">
+    No books found in this view.
+    {% if not summary.last_checked %}<br><br>Press <strong>Check Kobo now</strong> for the first scan.{% endif %}
+</div>
+{% endif %}
+
+<div id="settingsModal" class="modal-backdrop" onclick="backdropClose(event)">
+    <div class="modal">
+        <h2>Match settings</h2>
+        <p class="small">
+            One keyword or phrase per line. A book gets ★ MATCH when its title, author, genre/category, or synopsis contains any keyword.
+        </p>
+        <form method="post" action="{{ url_for('settings') }}">
+            <textarea name="keywords" spellcheck="false">{{ keywords_text }}</textarea>
+            <div class="modal-actions">
+                <button type="button" class="secondary" onclick="closeSettings()">Cancel</button>
+                <button type="submit">Save settings</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<footer>
+{% if summary.last_checked %}
+Last successful data update: {{ summary.last_checked }}
+{% else %}
+No scans yet.
+{% endif %}
+<br>
+The scraper depends on Kobo's public page HTML and may need adjusting if Kobo redesigns its site.
+</footer>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function openSettings() {
+    document.getElementById("settingsModal").classList.add("open");
+}
+function closeSettings() {
+    document.getElementById("settingsModal").classList.remove("open");
+}
+function backdropClose(event) {
+    if (event.target.id === "settingsModal") closeSettings();
+}
+document.addEventListener("keydown", function(event) {
+    if (event.key === "Escape") closeSettings();
+});
+</script>
+{% endblock %}

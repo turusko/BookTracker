@@ -1,0 +1,48 @@
+<tr>
+    <td class="book">
+        <a href="{{ book.url }}" target="_blank" rel="noopener">{{ book.title }}</a>
+        <div class="author">{{ book.author }}</div>
+    </td>
+    <td>
+        {% if book.current_price is not none %}
+            {% if book.old_price is not none %}
+                <span class="old">{{ book.old_price|money }}</span>
+            {% endif %}
+            <span class="price">{{ book.current_price|money }}</span>
+            <div class="small">Starting price: {{ book.baseline_price|money }}</div>
+            {% if book.current_price < book.baseline_price %}
+                <div class="small">
+                    Saved {{ (book.baseline_price - book.current_price)|money }} since tracking began
+                </div>
+            {% endif %}
+        {% else %}
+            Awaiting first price
+        {% endif %}
+    </td>
+    <td>
+        {% if book.on_sale %}
+            <span class="badge badge99">
+                On sale{% if book.check_error %} at last successful check{% endif %}
+            </span>
+        {% endif %}
+        {% if book.previous_price is not none and book.current_price < book.previous_price %}
+            <div class="small">
+                Dropped from {{ book.previous_price|money }} on last successful check
+            </div>
+        {% endif %}
+        <div class="small">Last checked: {{ book.last_checked or 'Not yet checked' }}</div>
+        {% if book.check_error %}
+            <div class="small check-error">
+                Check failed {{ book.last_attempt }}: {{ book.check_error }}
+            </div>
+        {% endif %}
+    </td>
+    <td>
+        <form method="post" action="{{ url_for('wishlist_remove') }}">
+            <input type="hidden" name="book_id" value="{{ book.id }}">
+            <button class="secondary" aria-label="Remove {{ book.title }} from wish list">
+                Remove
+            </button>
+        </form>
+    </td>
+</tr>

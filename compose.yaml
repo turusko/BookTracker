@@ -1,0 +1,16 @@
+services:
+  booktracker:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    ports:
+      - "127.0.0.1:5000:5000"
+    environment:
+      TZ: Europe/London
+    volumes:
+      - booktracker-data:/app/data
+      - ./Logs:/app/Logs
+    restart: unless-stopped
+
+volumes:
+  booktracker-data:

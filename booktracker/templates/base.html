@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}{{ app_title }}{% endblock %}</title>
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='booktracker-icon.png') }}">
+    <link rel="apple-touch-icon" href="{{ url_for('static', filename='booktracker-icon.png') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    {% block styles %}{% endblock %}
+</head>
+<body>
+    {% block content %}{% endblock %}
+    {% block scripts %}{% endblock %}
+</body>
+</html>

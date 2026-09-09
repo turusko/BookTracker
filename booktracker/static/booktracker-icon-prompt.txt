@@ -1,0 +1,3 @@
+Generated with the built-in image_gen tool.
+
+Use case: logo-brand. Create a single square raster website icon for BookTracker, a Kobo ebook deal and price-history tracker. A bold simple open book with a small downward price arrow integrated into the right page. Match existing website palette: violet #8b5cf6, near-white #f3f4f6, dark charcoal #0f1115. Flat polished geometric mark, thick shapes, exceptionally legible at favicon size. Centered symbol occupies 80 percent of square, solid dark charcoal background extending to all edges, violet book cover, near-white pages and violet downward arrow. No text, no letters, no numbers, no mockup, no thin details, no extra objects. Output one square icon.

@@ -1,0 +1,43 @@
+<h2>
+    {% if results|length == 1 %}
+        We found this book
+    {% elif results %}
+        We found several matches
+    {% else %}
+        No matches found
+    {% endif %}
+</h2>
+<p class="small">
+    {% if results %}
+        Confirm the title, author, and edition you want to track. Showing results from
+        the first Kobo search page; refine your search if needed.
+    {% else %}
+        Try another title or add the author's name.
+    {% endif %}
+</p>
+<div class="results">
+    {% for book in results %}
+        <div class="result">
+            <strong>
+                <a href="{{ book.url }}" target="_blank" rel="noopener">{{ book.title }}</a>
+            </strong>
+            <div>{{ book.author or 'Author unavailable - check the Kobo page before confirming' }}</div>
+            {% if book.edition %}
+                <div class="small">{{ book.edition }}</div>
+            {% endif %}
+            <div class="small">
+                Ebook
+                {% if book.language %} &middot; {{ book.language }}{% endif %}
+                {% if book.price is not none %} &middot; {{ book.price|money }}{% endif %}
+            </div>
+            {% if book.saved %}
+                <p>Already on your wish list</p>
+            {% else %}
+                <form method="post" action="{{ url_for('wishlist_add') }}">
+                    <input type="hidden" name="token" value="{{ book.token }}">
+                    <button>Add to wish list</button>
+                </form>
+            {% endif %}
+        </div>
+    {% endfor %}
+</div>

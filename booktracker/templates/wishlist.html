@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+
+{% block title %}Wish List - {{ app_title }}{% endblock %}
+
+{% block styles %}
+<link rel="stylesheet" href="{{ url_for('static', filename='wishlist.css') }}">
+{% endblock %}
+
+{% block content %}
+<div class="wrap">
+    <header>
+        <div>
+            <h1 class="brand-heading"><img class="brand-icon" src="{{ url_for('static', filename='booktracker-icon.png') }}" alt="" width="40" height="40"> Wish List</h1>
+            <div class="sub">Track confirmed Kobo UK ebooks and their prices.</div>
+        </div>
+        <div class="header-actions">
+            <a class="button secondary" href="{{ url_for('home') }}">Browse deals</a>
+            <form method="post" action="{{ url_for('scan') }}">
+                <input type="hidden" name="return_to" value="wishlist">
+                <button>Check Kobo now</button>
+            </form>
+        </div>
+    </header>
+
+    {% if message %}
+        <div class="notice" role="status">{{ message }}</div>
+    {% endif %}
+
+    <h2>Add a book</h2>
+    <form class="add-form" method="post" action="{{ url_for('wishlist_search') }}">
+        <label>
+            Book title
+            <input name="title" value="{{ title or '' }}" required maxlength="250">
+        </label>
+        <label>
+            Author (optional)
+            <input name="author" value="{{ author or '' }}" maxlength="100">
+        </label>
+        <button type="submit">Find on Kobo</button>
+    </form>
+
+    {% if results is defined %}
+        {% include "wishlist_search_results.html" %}
+    {% endif %}
+
+    <h2>Your books ({{ books|length }})</h2>
+    {% if books %}
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Book</th>
+                        <th>Price</th>
+                        <th>Tracking</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for book in books %}
+                        {% include "wishlist_book_row.html" %}
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <div class="empty">
+            Your wish list is empty. Find a book above to start tracking its price.
+        </div>
+    {% endif %}
+
+    <footer>
+        Prices update when you press Check Kobo now. A sale means Kobo shows a higher
+        previous or list price; offers requiring coupons or membership are not tracked.
+    </footer>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='wishlist.js') }}"></script>
+{% endblock %}
