@@ -9,9 +9,7 @@
     </div>
     <div class="header-actions">
         <button type="button" class="secondary" onclick="openSettings()">Settings</button>
-        <form method="post" action="{{ url_for('scan') }}">
-            <button type="submit">Check Kobo now</button>
-        </form>
+        <a class="button" href="{{ url_for('extension.setup') }}">Browser extension</a>
     </div>
 </header>
 
@@ -100,7 +98,7 @@
 {% else %}
 <div class="empty">
     No books found in this view.
-    {% if not summary.last_checked %}<br><br>Press <strong>Check Kobo now</strong> for the first scan.{% endif %}
+    {% if not summary.last_checked %}<br><br>Use the <strong>browser extension</strong> for the first scan.{% endif %}
 </div>
 {% endif %}
 

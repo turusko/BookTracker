@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}Connect browser extension{% endblock %}
+{% block content %}
+<main style="max-width:720px;margin:48px auto;padding:24px">
+  <h1>Connect your browser</h1>
+  <p>Load the <strong>extension</strong> folder from this project using “Load unpacked” on Edge or Chrome's extensions page. Enable Developer mode there first.</p>
+  <p>Click the BookTracker extension, then paste this connection code into its scan page:</p>
+  <input aria-label="Connection code" readonly value="{{ token }}" style="width:100%;font-family:monospace">
+  <p>The code changes when BookTracker restarts. Keep this app running.</p>
+  <p>The extension scans all configured deal lists and wishlist books in a regular browser tab. Complete any Kobo verification there. Use Pause/Resume on the scan tab, or skip a failed page. Previously saved prices are kept if you stop the scan; unseen books are not marked ended.</p>
+  <a href="/">Back to BookTracker</a>
+</main>
+{% endblock %}

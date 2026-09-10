@@ -74,36 +74,6 @@ class ScanTests(unittest.TestCase):
         for suffix in ("/", "?tracking=1", "#preview", "/?tracking=1#preview"):
             self.assertEqual(scraper.canonical_book_id(url + suffix, "Title", "Author"), expected)
 
-    def test_unreadable_page_and_page_limit_report_incomplete_scan(self):
-        with patch.object(scraper, "fetch_page", return_value="Blocked"):
-            self.assertTrue(scraper.scrape_deal_list(Mock(), "Deals", "url")[1])
-        with (
-            patch.object(scraper, "MAX_PAGES_PER_LIST", 1),
-            patch.object(scraper, "fetch_page", return_value="page"),
-            patch.object(scraper, "extract_books", return_value=[book(str(i)) for i in range(20)]),
-        ):
-            books, errors = scraper.scrape_deal_list(Mock(), "Deals", "url")
-        self.assertEqual(len(books), 20)
-        self.assertTrue(errors)
-
-    def test_app_preserves_missing_books_after_partial_failure(self):
-        from booktracker import app as web
-        database.save_scan([book("missing")])
-        with patch.object(web, "scrape_all", return_value=([book("new")], ["Page failed"])):
-            web.scan_deals_and_report()
-        self.assertEqual(database.get_book("missing")["is_active"], 1)
-        self.assertIsNotNone(database.get_book("new"))
-
-    def test_saved_books_without_metadata_do_not_fetch_details(self):
-        database.save_scan([book()])
-        session = Mock()
-        session.get.return_value.text = "<html></html>"
-        books = [book(), book("new")]
-        with patch.object(scraper, "MAX_DETAIL_FETCHES_PER_SCAN", 1):
-            enriched, errors = scraper.enrich_missing_metadata(session, books)
-        self.assertEqual((enriched, errors), (1, []))
-        self.assertEqual(session.get.call_args.args, (books[1]["url"],))
-        self.assertEqual(session.get.call_count, 1)
 
     def test_repeat_scan_preserves_details_and_price_drop(self):
         database.save_scan([book(synopsis="Saved synopsis", genres="Fantasy")])
@@ -141,48 +111,6 @@ class ScanTests(unittest.TestCase):
                 1,
             )
 
-    def test_enrichment_uses_open_session(self):
-        session = Mock()
-        session.__enter__ = Mock(return_value=session)
-        session.__exit__ = Mock(return_value=False)
-
-        def enrich(active_session, books):
-            self.assertIs(active_session, session)
-            session.__exit__.assert_not_called()
-            return 0, []
-
-        with (
-            patch.object(scraper.requests, "Session", return_value=session),
-            patch.object(scraper, "DEAL_PAGES", {"Deals": "https://example.test"}),
-            patch.object(scraper, "fetch_page", return_value=""),
-            patch.object(scraper, "extract_books", return_value=[book()]),
-            patch.object(scraper, "enrich_missing_metadata", side_effect=enrich),
-        ):
-            books, errors = scraper.scrape_all()
-        self.assertEqual(len(books), 1)
-        self.assertEqual(errors, [])
-        session.__exit__.assert_called_once()
-
-    def test_paginated_deals_keep_lowest_price_and_stop_on_repeated_page(self):
-        first_page = [book(str(index), price=4.99) for index in range(20)]
-        second_page = [book(str(index), price=2.99) for index in range(10, 30)]
-        with (
-            patch.object(scraper, "fetch_page", return_value="page") as fetch,
-            patch.object(
-                scraper,
-                "extract_books",
-                side_effect=[first_page, second_page, second_page],
-            ),
-        ):
-            books, errors = scraper.scrape_deal_list(
-                Mock(), "Deals", "https://example.test"
-            )
-        self.assertEqual(errors, [])
-        self.assertEqual(len(books), 30)
-        self.assertEqual(fetch.call_count, 3)
-        prices = {saved_book["id"]: saved_book["current_price"] for saved_book in books}
-        self.assertEqual(prices["0"], 4.99)
-        self.assertEqual(prices["10"], 2.99)
 
     def test_metadata_preserves_structured_synopsis_and_combines_genres(self):
         html = """

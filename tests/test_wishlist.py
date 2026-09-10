@@ -40,6 +40,7 @@ class WishlistTests(unittest.TestCase):
         self.book = book("wish", url=URL)
         self.client = web.app.test_client()
 
+
     def test_membership_survives_deals_and_no_duplicate(self):
         self.assertTrue(database.add_to_wishlist(self.book))
         self.assertFalse(database.add_to_wishlist(self.book))
@@ -86,49 +87,15 @@ class WishlistTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             scraper.wishlist_url("https://example.com/gb/en/ebook/example")
 
-    def test_check_continues_after_one_failure(self):
-        database.add_to_wishlist(self.book)
-        database.add_to_wishlist(book("other", url=URL + "-other"))
-        response = Mock(text=product(url=URL + "-other"))
-        session = Mock()
-        session.get.side_effect = [RuntimeError("Timeout"), response]
-        session.__enter__ = Mock(return_value=session)
-        session.__exit__ = Mock(return_value=False)
-        with patch.object(scraper.requests, "Session", return_value=session):
-            result = scraper.check_wishlist()
-        self.assertEqual(result["failed"], 1)
-        self.assertEqual(result["checked"], 1)
-
-    def test_wishlist_runs_when_deal_scan_fails(self):
-        for result in (RuntimeError("Blocked"), ([], ["Blocked"])):
-            with patch.object(web, "scrape_all") as deals, patch.object(
-                web,
-                "check_wishlist",
-                return_value=dict(checked=2, drops=1, sales=0, failed=0),
-            ) as wishes:
-                if isinstance(result, Exception):
-                    deals.side_effect = result
-                else:
-                    deals.return_value = result
-                response = self.client.post(
-                    "/scan", data={"return_to": "wishlist"}, follow_redirects=True
-                )
-                wishes.assert_called_once()
-                self.assertIn(b"2 checked, 1 price drops", response.data)
 
     def test_confirmation_signed_duplicate_remove_and_render(self):
-        result = dict(self.book, edition="Illustrated", language="EN", price=4.99)
-        with patch.object(web, "search_kobo", return_value=[result]):
-            response = self.client.post("/wishlist/search", data={"title": "Example"})
+        database.save_scan([self.book])
+        response = self.client.post("/wishlist/search", data={"title": self.book["title"]})
         self.assertIn(b"We found this book", response.data)
         self.assertEqual(database.get_wishlist(), [])
-        with patch.object(
-            web, "check_wishlist_book", return_value={"failed": 0}
-        ) as check:
-            token = web.book_confirmation_tokens.dumps(self.book)
-            self.client.post("/wishlist/add", data={"token": token})
-            self.client.post("/wishlist/add", data={"token": token})
-            check.assert_called_once()
+        token = web.book_confirmation_tokens.dumps(self.book)
+        self.client.post("/wishlist/add", data={"token": token})
+        self.client.post("/wishlist/add", data={"token": token})
         self.assertEqual(len(database.get_wishlist()), 1)
         self.assertEqual(self.client.get("/wishlist").status_code, 200)
         self.client.post("/wishlist/add", data={"token": "tampered"})

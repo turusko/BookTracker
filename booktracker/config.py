@@ -16,17 +16,6 @@ DEAL_PAGES = {
 }
 
 MAX_PAGES_PER_LIST = 20
-MAX_DETAIL_FETCHES_PER_SCAN = 25
-TIMEOUT = 20
-
-HEADERS = {
-    "User-Agent": (
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-        "AppleWebKit/537.36 (KHTML, like Gecko) "
-        "Chrome/152 Safari/537.36"
-    ),
-    "Accept-Language": "en-GB,en;q=0.9",
-}
 
 
 DEFAULT_FAVOURITE_KEYWORDS = [

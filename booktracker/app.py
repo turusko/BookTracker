@@ -1,9 +1,7 @@
 import logging
-from time import monotonic
 import secrets
 from datetime import datetime
 
-from curl_cffi import requests
 from flask import Flask, redirect, render_template, request, url_for
 from itsdangerous import BadSignature, URLSafeTimedSerializer
 
@@ -17,12 +15,11 @@ from .database import (
     query_books,
     remove_from_wishlist,
     save_favourite_keywords,
-    save_scan,
     stats,
 )
-from .scraper import check_wishlist, check_wishlist_book, scrape_all, search_kobo
 from .utils import money
 from .logging_setup import configure_logging
+from .extension_api import bridge
 
 logger = logging.getLogger("booktracker.app")
 
@@ -32,6 +29,8 @@ log_handler = configure_logging()
 app = Flask(__name__)
 app.logger.addHandler(log_handler)
 app.config["SECRET_KEY"] = secrets.token_hex(32)
+app.config["EXTENSION_TOKEN"] = secrets.token_urlsafe(32)
+app.register_blueprint(bridge)
 book_confirmation_tokens = URLSafeTimedSerializer(
     app.config["SECRET_KEY"], salt="wishlist-book"
 )
@@ -102,7 +101,9 @@ def wishlist_search():
     title = request.form.get("title", "")
     author = request.form.get("author", "")
     try:
-        results = search_kobo(title, author)
+        results = [dict(book, price=book["current_price"], edition="", language="")
+                   for book in query_books("all", title)
+                   if author.casefold() in (book["author"] or "").casefold()]
         saved_book_ids = {book["id"] for book in get_wishlist()}
         for book in results:
             book["token"] = book_confirmation_tokens.dumps(book)
@@ -153,11 +154,7 @@ def wishlist_add():
         )
     if not add_to_wishlist(book):
         return redirect(url_for("wishlist", message="Already on your wish list."))
-    with requests.Session(impersonate="chrome") as session:
-        result = check_wishlist_book(session, book)
-    message = "Added to your wish list."
-    if result["failed"]:
-        message += " The initial price check failed; Check Kobo now will retry."
+    message = "Added to your wish list. Use the browser extension to update its price."
     return redirect(url_for("wishlist", message=message))
 
 
@@ -165,48 +162,6 @@ def wishlist_add():
 def wishlist_remove():
     remove_from_wishlist(request.form.get("book_id", ""))
     return redirect(url_for("wishlist", message="Removed from your wish list."))
-
-
-@app.post("/scan")
-def scan():
-    messages = [scan_deals_and_report(), check_wishlist_and_report()]
-    destination = "wishlist" if request.form.get("return_to") == "wishlist" else "home"
-    return redirect(url_for(destination, message=" ".join(messages)))
-
-
-def scan_deals_and_report():
-    started = monotonic()
-    logger.info("Deal scan started")
-    try:
-        scraped_books, errors = scrape_all()
-        if scraped_books:
-            book_count = save_scan(scraped_books, complete=not errors)
-            message = f"Scan complete: {book_count} unique Kobo deal books found."
-        else:
-            message = "Deal scan failed: no books returned."
-            logger.warning(message)
-        if errors:
-            for error in errors:
-                logger.warning("Incomplete deal scan: %s", error)
-            message += " Some deal pages failed: " + "; ".join(errors[:2])
-        return message
-    except Exception as error:
-        logger.exception("Deal scan failed")
-        return f"Deal scan failed: {error}"
-    finally:
-        logger.info("Deal scan finished in %.2f seconds", monotonic() - started)
-
-
-def check_wishlist_and_report():
-    try:
-        result = check_wishlist()
-        return (
-            f"Wish list: {result['checked']} checked, {result['drops']} price drops, "
-            f"{result['sales']} newly on sale, {result['failed']} checks failed."
-        )
-    except Exception as error:
-        logger.exception("Wish-list check failed")
-        return f"Wish-list check failed: {error}"
 
 
 def run():

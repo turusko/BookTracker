@@ -1,0 +1,11 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>BookTracker browser scan</title>
+<style>body{font:16px system-ui;max-width:720px;margin:48px auto;padding:24px;background:#faf8f2;color:#242820}input{width:100%;box-sizing:border-box;padding:12px}button{padding:12px 20px;margin:16px 8px 0 0;cursor:pointer}li{margin:12px 0}#status{white-space:pre-wrap}</style></head>
+<body><h1>BookTracker browser scan</h1>
+<p>Scan deals and wishlist books, or just update your wishlist prices. Keep this tab open while it runs.</p>
+<p><a href="http://127.0.0.1:5000/extension" target="_blank" rel="noreferrer">Get your connection code from BookTracker</a></p>
+<label for="token">Connection code</label><input id="token" type="password" autocomplete="off">
+<p><label for="scope">Scan</label> <select id="scope"><option value="all">Deals and wishlist</option><option value="wishlist">Wishlist only</option></select></p>
+<button id="start">Start scan</button><button id="pause" disabled>Pause</button><button id="skip" disabled>Skip failed page</button><button id="stop" disabled>Stop</button>
+<p id="progress" role="status"></p><p id="status" role="status">Ready.</p><ul id="results"></ul>
+<script src="scan.js"></script></body></html>

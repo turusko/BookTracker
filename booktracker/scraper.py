@@ -1,5 +1,3 @@
-import logging
-from time import monotonic
 import hashlib
 import json
 import re
@@ -7,19 +5,8 @@ from decimal import Decimal, InvalidOperation
 from urllib.parse import urljoin, urlsplit, urlunsplit
 
 from bs4 import BeautifulSoup
-from curl_cffi import requests
-
-from .config import (
-    DEAL_PAGES,
-    HEADERS,
-    MAX_DETAIL_FETCHES_PER_SCAN,
-    MAX_PAGES_PER_LIST,
-    TIMEOUT,
-)
-from .database import db, get_wishlist, save_wishlist_check
 from .utils import clean_text, price_from_text, prices_from_text
 
-logger = logging.getLogger("booktracker.scraper")
 
 MIN_BOOKS_ON_FULL_DEAL_PAGE = 20
 MAX_PRODUCT_CONTAINER_DEPTH = 7
@@ -206,60 +193,6 @@ def unique_genre_labels(genres):
     return cleaned_genres
 
 
-def enrich_missing_metadata(session, books):
-    if not books:
-        return 0, []
-
-    with db() as connection:
-        existing = {
-            row["id"]: row
-            for row in connection.execute(
-                "SELECT id, synopsis, genres FROM books WHERE id IN (%s)"
-                % ",".join("?" for _ in books),
-                [book["id"] for book in books],
-            ).fetchall()
-        }
-
-    candidates = []
-    for book in books:
-        row = existing.get(book["id"])
-        has_synopsis = bool(row and clean_text(row["synopsis"]))
-        has_genres = bool(row and clean_text(row["genres"]))
-
-        book["synopsis"] = row["synopsis"] if has_synopsis else book.get("synopsis", "")
-        book["genres"] = row["genres"] if has_genres else book.get("genres", "")
-
-        if row is None and (
-            not clean_text(book.get("synopsis")) or not clean_text(book.get("genres"))
-        ):
-            candidates.append(book)
-
-    errors = []
-    enriched = 0
-
-    for book in candidates[:MAX_DETAIL_FETCHES_PER_SCAN]:
-        try:
-            response = session.get(
-                book["url"],
-                headers=HEADERS,
-                timeout=TIMEOUT,
-                impersonate="chrome",
-            )
-            response.raise_for_status()
-            synopsis, genres = extract_product_metadata(response.text)
-
-            if synopsis:
-                book["synopsis"] = synopsis
-            if genres:
-                book["genres"] = genres
-            enriched += 1
-        except Exception as error:
-            logger.exception("Metadata fetch failed: book=%s", book["id"])
-            errors.append(f"{book['title']}: {error}")
-
-    return enriched, errors
-
-
 def extract_books(html: str, source_name: str):
     soup = BeautifulSoup(html, "html.parser")
     found = {}
@@ -344,84 +277,6 @@ def extract_deal_card_author(container, title, block_text):
     return author
 
 
-def fetch_page(session: requests.Session, base_url: str, page_number: int):
-    params = {} if page_number == 1 else {"pageNumber": page_number}
-    response = session.get(
-        base_url,
-        params=params,
-        headers=HEADERS,
-        timeout=TIMEOUT,
-        impersonate="chrome",
-    )
-    response.raise_for_status()
-    return response.text
-
-
-def scrape_all():
-    all_books = {}
-    errors = []
-
-    with requests.Session(impersonate="chrome") as session:
-        for source_name, base_url in DEAL_PAGES.items():
-            source_books, source_errors = scrape_deal_list(
-                session, source_name, base_url
-            )
-            keep_lowest_deal_prices(all_books, source_books)
-            errors.extend(source_errors)
-
-        books = list(all_books.values())
-        _, metadata_errors = enrich_missing_metadata(session, books)
-    if metadata_errors:
-        errors.extend(f"Metadata: {error}" for error in metadata_errors[:5])
-
-    return books, errors
-
-
-def scrape_deal_list(session, source_name, base_url):
-    all_books = {}
-    errors = []
-    previous_page_ids = None
-
-    for page_number in range(1, MAX_PAGES_PER_LIST + 1):
-        try:
-            html = fetch_page(session, base_url, page_number)
-            books = extract_books(html, source_name)
-        except Exception as error:
-            logger.exception("Deal page failed: source=%s page=%d", source_name, page_number)
-            message = str(error)
-            if "403" in message:
-                message += " (Kobo blocked the request; update curl-cffi with: pip install -U curl-cffi)"
-            errors.append(f"{source_name}, page {page_number}: {message}")
-            break
-
-        logger.info("Deal page read: source=%s page=%d books=%d", source_name, page_number, len(books))
-        page_ids = {book["id"] for book in books}
-
-        if not books:
-            errors.append(f"{source_name}, page {page_number}: no readable books returned")
-            break
-        if page_ids == previous_page_ids:
-            break
-
-        previous_page_ids = page_ids
-
-        keep_lowest_deal_prices(all_books, books)
-
-        if len(books) < MIN_BOOKS_ON_FULL_DEAL_PAGE:
-            break
-    else:
-        errors.append(f"{source_name}: page limit reached; scan may be incomplete")
-
-    return list(all_books.values()), errors
-
-
-def keep_lowest_deal_prices(books_by_id, incoming_books):
-    for book in incoming_books:
-        existing = books_by_id.get(book["id"])
-        if existing is None or book["current_price"] < existing["current_price"]:
-            books_by_id[book["id"]] = book
-
-
 def wishlist_url(url):
     ebook_path_prefix = "/gb/en/ebook/"
     parts = urlsplit(url)
@@ -489,22 +344,6 @@ def extract_search_card(anchor, card, url):
     }
 
 
-def search_kobo(title, author=""):
-    query = clean_text(f"{title} {author}")
-    if not clean_text(title) or len(query) > 300:
-        raise ValueError("Enter a book title (up to 300 characters including author).")
-    with requests.Session(impersonate="chrome") as session:
-        response = session.get(
-            "https://www.kobo.com/gb/en/search",
-            params={"query": query},
-            headers=HEADERS,
-            timeout=TIMEOUT,
-            allow_redirects=False,
-        )
-        response.raise_for_status()
-        return extract_search_results(response.text)
-
-
 def extract_product_price(html, expected_url):
     soup = BeautifulSoup(html, "html.parser")
     canonical = soup.select_one('link[rel="canonical"]')
@@ -557,34 +396,3 @@ def extract_open_graph_price(soup):
         except (InvalidOperation, KeyError):
             pass
     return None
-
-
-def check_wishlist_book(session, book):
-    try:
-        url = wishlist_url(book["url"])
-        response = session.get(
-            url, headers=HEADERS, timeout=TIMEOUT, allow_redirects=False
-        )
-        response.raise_for_status()
-        price, old_price = extract_product_price(response.text, url)
-        price_dropped, newly_on_sale = save_wishlist_check(book["id"], price, old_price)
-        return dict(
-            checked=1, drops=int(price_dropped), sales=int(newly_on_sale), failed=0
-        )
-    except Exception as error:
-        logger.exception("Wish-list price check failed: book=%s", book["id"])
-        save_wishlist_check(book["id"], error=str(error))
-        return dict(checked=0, drops=0, sales=0, failed=1)
-
-
-def check_wishlist():
-    started = monotonic()
-    logger.info("Wish-list check started")
-    totals = dict(checked=0, drops=0, sales=0, failed=0)
-    with requests.Session(impersonate="chrome") as session:
-        for book in get_wishlist():
-            result = check_wishlist_book(session, book)
-            for key in totals:
-                totals[key] += result[key]
-    logger.info("Wish-list check finished in %.2f seconds: %s", monotonic() - started, totals)
-    return totals

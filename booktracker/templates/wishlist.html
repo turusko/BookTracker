@@ -15,10 +15,7 @@
         </div>
         <div class="header-actions">
             <a class="button secondary" href="{{ url_for('home') }}">Browse deals</a>
-            <form method="post" action="{{ url_for('scan') }}">
-                <input type="hidden" name="return_to" value="wishlist">
-                <button>Check Kobo now</button>
-            </form>
+            <a class="button" href="{{ url_for('extension.setup') }}">Browser extension</a>
         </div>
     </header>
 
@@ -36,7 +33,7 @@
             Author (optional)
             <input name="author" value="{{ author or '' }}" maxlength="100">
         </label>
-        <button type="submit">Find on Kobo</button>
+        <button type="submit">Find imported books</button>
     </form>
 
     {% if results is defined %}
@@ -69,7 +66,7 @@
     {% endif %}
 
     <footer>
-        Prices update when you press Check Kobo now. A sale means Kobo shows a higher
+        Prices update when you run the browser extension scan. A sale means Kobo shows a higher
         previous or list price; offers requiring coupons or membership are not tracked.
     </footer>
 </div>

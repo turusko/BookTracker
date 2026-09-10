@@ -1,0 +1,10 @@
+{
+  "manifest_version": 3,
+  "name": "BookTracker browser scan",
+  "version": "0.3.0",
+  "description": "Read Kobo deal lists and wishlist pages into your local BookTracker.",
+  "permissions": ["scripting", "storage"],
+  "host_permissions": ["https://www.kobo.com/*", "http://127.0.0.1/*"],
+  "action": {"default_title": "Open BookTracker scan"},
+  "background": {"service_worker": "background.js"}
+}
